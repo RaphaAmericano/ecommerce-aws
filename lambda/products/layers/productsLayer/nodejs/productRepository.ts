@@ -18,7 +18,7 @@ export class ProductRepository {
     }
 
     public async getAllProducts(): Promise<Product[]> {
-        // TODO: Refatorar depois para igual ao codigo do outro curso
+        // TODO: Refatorar depois para versão v3 do sdk igual ao curso do mahmet
         const data = await this.ddbClient.scan({
             TableName: this.productsDdb
         }).promise()
@@ -47,6 +47,41 @@ export class ProductRepository {
             Item: product
         }).promise()
         return product
+    }
+
+    public async delete(productId: string): Promise<Product>{
+        const data = await this.ddbClient.delete({
+            TableName: this.productsDdb,
+            Key:{
+                id: productId
+            },
+            ReturnValues: "ALL_OLD"
+        }).promise()
+        if(data.Attributes) {
+            return data.Attributes as Product
+        } else {
+            throw new Error("Product not found")
+        }
+
+    }
+
+    public async updateProduct(productId: string, product: Product): Promise<Product>{
+        const data = await this.ddbClient.update({
+            TableName: this.productsDdb,
+            Key: {
+                id: productId
+            },
+            ConditionExpression: "attribute_exisits(id)",
+            ReturnValues: "UPDATED_NEW",
+            UpdateExpression: "set productName = :n, code = :c, price = :p, model = :m",
+            ExpressionAttributeValues: {
+                ":n": product.productName,
+                ":c": product.code,
+                ":p": product.price,
+                ":m": product.model
+            }
+        }).promise()
+        return data.Attributes as Product
     }
 
 }
