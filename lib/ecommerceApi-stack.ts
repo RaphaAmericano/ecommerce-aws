@@ -6,7 +6,8 @@ import { Construct } from "constructs"
 
 interface ECommerceApiStackProps extends cdk.StackProps {
     productsFetchHandler: lambdaNodeJS.NodejsFunction;
-    productsAdminHandler: lambdaNodeJS.NodejsFunction
+    productsAdminHandler: lambdaNodeJS.NodejsFunction;
+    ordersHandler: lambdaNodeJS.NodejsFunction;
 }
 
 export class EcommerceApiStack extends cdk.Stack {
@@ -32,6 +33,40 @@ export class EcommerceApiStack extends cdk.Stack {
             }
         })
 
+        this.createProductsService(props, api)
+        this.createOrdersService(props, api)
+    }   
+
+    private createOrdersService(props: ECommerceApiStackProps, api: apigateway.RestApi): void {
+        const ordersIntegration = new apigateway.LambdaIntegration(props.ordersHandler)
+        // info: resource - /orders
+
+        const ordersResource = api.root.addResource("orders")
+        // ? GET /orders
+        // ? GET /orders?email=no-reply@email.com.br
+        // ? GET /orders?email=no-reply@email.com.br&orderId=123
+        ordersResource.addMethod("GET", ordersIntegration)
+
+        
+        // ? DELETE /orders?email=no-reply@email.com.br&orderId=123
+        const orderDeletionValidator = new apigateway.RequestValidator(this, "OrderDeletionValidator", {
+            restApi: api, 
+            requestValidatorName: "OrderDeletionValidator",
+            validateRequestParameters: true,
+        })
+        ordersResource.addMethod("DELETE", ordersIntegration, {
+            requestParameters: {
+                "method.request.querystring.email": true,
+                "method.request.querystring.orderId": true,
+            },
+            requestValidator: orderDeletionValidator
+        })
+        // ? POST /orders
+        ordersResource.addMethod("POST", ordersIntegration)
+
+
+    }
+    private createProductsService(props: ECommerceApiStackProps, api: apigateway.RestApi ): void {
         const productsFetchIntegration = new apigateway.LambdaIntegration(props.productsFetchHandler)
         // ? "/products"
         const productsResource = api.root.addResource("products")
@@ -53,7 +88,6 @@ export class EcommerceApiStack extends cdk.Stack {
 
         // ? DELETE /products/{id}
         productIdResource.addMethod("DELETE", productsAdminIntegration)
+    }
 
-
-    }   
 }
