@@ -15,7 +15,7 @@ export interface Order {
         carrier: "CORREIOS" | "FEDEX"
     },
     billing: {
-        payment: "CASH" | "DEBIC_CARD" | "CREDIT_CARD";
+        payment: "CASH" | "DEBIT_CARD" | "CREDIT_CARD";
         totalPrice: number;
     },
     products: OrderProduct[]
