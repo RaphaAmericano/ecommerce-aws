@@ -31,7 +31,12 @@ export class OrdersAppStack extends cdk.Stack {
 
         // Orders Layer
         const ordersLayerArn = ssm.StringParameter.valueForStringParameter(this, "OrdersLayerVersionArn")
-        const ordersLyer = lambda.LayerVersion.fromLayerVersionArn(this, "OrdersLayerVersionArn", ordersLayerArn)
+        const ordersLayer = lambda.LayerVersion.fromLayerVersionArn(this, "OrdersLayerVersionArn", ordersLayerArn)
+
+        // Orders API Layer
+        const ordersApiLayerArn = ssm.StringParameter.valueForStringParameter(this, "OrdersLayerApiVersionArn")
+        const ordersApiLyer = lambda.LayerVersion.fromLayerVersionArn(this, "OrdersApiLayerVersionArn", ordersApiLayerArn)
+
         // Products Layer 
         // ? Products Layer
         const productsLayerArn = ssm.StringParameter.valueForStringParameter(this, "ProductsLayerVersionArn")
@@ -52,7 +57,7 @@ export class OrdersAppStack extends cdk.Stack {
                 PRODUCTS_DDB: props.productsDdb.tableName,
                 ORDERS_DDB: ordersDdb.tableName
             },
-            layers: [ordersLyer, productsLayer],
+            layers: [ordersLayer, productsLayer, ordersApiLyer],
             tracing: lambda.Tracing.ACTIVE,
             insightsVersion: lambda.LambdaInsightsVersion.VERSION_1_0_119_0
         })
