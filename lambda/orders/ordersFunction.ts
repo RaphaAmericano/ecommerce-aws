@@ -30,12 +30,35 @@ export async function handler(event: APIGatewayProxyEvent, context: Context ): P
             if(email){
                 if(orderId){
                     // Get one order from an user
+                    try {
+                        const order = await orderRepository.getOrder(email, orderId)
+                        return {
+                            statusCode: 200,
+                            body: JSON.stringify(convertToOrderResponse(order))
+                        }                        
+                    } catch (error) {
+                        console.error((<Error>error).message)
+                        return {
+                            statusCode: 404,
+                            body: (<Error>error).message
+                        }
+                    }
                 } else {
                     // Get all orders from an user
+                    const orders = await orderRepository.getOrdersByEmail(email)
+                    return {
+                        statusCode: 200,
+                        body: JSON.stringify(orders.map(convertToOrderResponse))
+                    }
                 }
             }
         } else {
             console.log("GET /orders")    
+            const orders = await orderRepository.getAllOrders()
+            return {
+                statusCode: 200,
+                body: JSON.stringify(orders.map(convertToOrderResponse))
+            }
         }
     } else if (method === "POST"){
         console.log("POST /orders")
@@ -57,8 +80,22 @@ export async function handler(event: APIGatewayProxyEvent, context: Context ): P
 
      } else if (method === "DELETE"){
         console.log("DELETE /orders")
-        const email = event.queryStringParameters!.email
-        const orderId = event.queryStringParameters!.orderId
+        const email = event.queryStringParameters!.email!
+        const orderId = event.queryStringParameters!.orderId!
+
+        try {
+            const orderDeleted = await orderRepository.deleteOrder(email, orderId)
+            return {
+                statusCode: 200, 
+                body: JSON.stringify(convertToOrderResponse(orderDeleted))
+            }
+        } catch (error) {
+            console.error((<Error>error).message)
+            return {
+                statusCode: 404, 
+                body: (<Error>error).message
+            }
+        }
 
      }
 
