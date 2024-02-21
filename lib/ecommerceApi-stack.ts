@@ -119,7 +119,47 @@ export class EcommerceApiStack extends cdk.Stack {
         const productsAdminIntegration = new apigateway.LambdaIntegration(props.productsAdminHandler)
 
         // ? POST /products
-        productsResource.addMethod("POST", productsAdminIntegration)
+        const productRequestValidator = new apigateway.RequestValidator(this, "ProductRequestValidator", {
+            restApi: api,
+            requestValidatorName: "Product request validator",
+            validateRequestBody: true
+        })
+
+        const productModel = new apigateway.Model(this, "ProductModel", {
+            modelName:"ProductModel",
+            restApi: api,
+            schema: {
+                type: apigateway.JsonSchemaType.OBJECT,
+                properties: {
+                    productName: {
+                        type: apigateway.JsonSchemaType.STRING,
+                    },
+                    code: {
+                        type: apigateway.JsonSchemaType.STRING
+                    },
+                    price: {
+                        type: apigateway.JsonSchemaType.NUMBER
+                    },
+                    model: {
+                        type: apigateway.JsonSchemaType.STRING
+                    },
+                    productUrl: {
+                        type: apigateway.JsonSchemaType.STRING
+                    }
+                },
+                required: [
+                    "productName",
+                    "code"
+                ]
+            }
+        })
+
+        productsResource.addMethod("POST", productsAdminIntegration, {
+            requestValidator: productRequestValidator,
+            requestModels: {
+                "application/json": productModel
+            }
+        })
 
         // ? PUT /products/{id}
         productIdResource.addMethod("PUT", productsAdminIntegration)
