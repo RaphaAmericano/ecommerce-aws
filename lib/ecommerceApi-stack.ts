@@ -162,7 +162,12 @@ export class EcommerceApiStack extends cdk.Stack {
         })
 
         // ? PUT /products/{id}
-        productIdResource.addMethod("PUT", productsAdminIntegration)
+        productIdResource.addMethod("PUT", productsAdminIntegration, {
+            requestValidator: productRequestValidator,
+            requestModels: {
+                "application/json": productModel
+            }
+        })
 
         // ? DELETE /products/{id}
         productIdResource.addMethod("DELETE", productsAdminIntegration)
