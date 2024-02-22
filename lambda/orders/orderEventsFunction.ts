@@ -1,8 +1,9 @@
-import { DynamoDB } from "aws-sdk"
+import { AWSError, DynamoDB } from "aws-sdk"
 import * as AWSXRay from "aws-xray-sdk"
 import { OrderEventDdb, OrderEventRepository } from "/opt/nodejs/orderEventsRepositoryLayer"
 import { Context, SNSEvent, SNSMessage } from "aws-lambda"
 import { Envelope, OrderEvent } from "./layers/orderEventsLayer/nodejs/orderEvent"
+import { PromiseResult } from "aws-sdk/lib/request"
 
 AWSXRay.captureAWS(require("aws-sdk"))
 
@@ -12,7 +13,12 @@ const ddbClient = new DynamoDB.DocumentClient()
 const orderEventsRepository = new OrderEventRepository(ddbClient, eventsDdb)
 
 export async function handler(event: SNSEvent, context: Context): Promise<void> {
-    
+    const promises:Promise<PromiseResult<DynamoDB.DocumentClient.PutItemOutput, AWSError>>[] = []
+    event.Records.forEach((record) => {
+        promises.push(createEvent(record.Sns))
+    })
+    await Promise.all(promises)
+
     return 
 }
 

@@ -5,6 +5,8 @@ import * as AWSXRay from "aws-xray-sdk"
 import { APIGatewayProxyEvent, APIGatewayProxyResult, Context } from "aws-lambda"
 import { CarrierType, OrderProductResponse, OrderRequest, OrderResponse, PaymentType, ShippingType } from "/opt/nodejs/ordersApiLayer"
 import { OrderEvent, OrderEventType, Envelope } from "./layers/orderEventsLayer/nodejs/orderEvent"
+import { v4 as uuid } from "uuid"
+
 AWSXRay.captureAWS(require("aws-sdk"))
 
 const ordersDdb = process.env.ORDERS_DDB!
@@ -67,16 +69,18 @@ export async function handler(event: APIGatewayProxyEvent, context: Context ): P
         const products = await productRepository.getProductsByIds(orderRequest.productsIds)        
         if(products.length === orderRequest.productsIds.length){
             const order = buildOrder(orderRequest, products)
-            const orderCreated = await orderRepository.createOrder(order)
+            const orderCreatedPromise = orderRepository.createOrder(order)
+            const eventResultPromise = sendOrderEvent(order, OrderEventType.CREATED, lambdaRequestId)
 
-            const eventResult = await sendOrderEvent(orderCreated, OrderEventType.CREATED, lambdaRequestId)
+            const results = await Promise.all([orderCreatedPromise, eventResultPromise])
+
             console.log(
-                `Order created event sent - OrderId: ${orderCreated.sk} - MEssageId: ${eventResult.MessageId}` 
+                `Order created event sent - OrderId: ${order.sk} - MEssageId: ${results[1].MessageId}` 
             )
 
             return {
                 statusCode: 201,
-                body: JSON.stringify(convertToOrderResponse(orderCreated))
+                body: JSON.stringify(convertToOrderResponse(order))
             }
         } else {
             return {
@@ -186,6 +190,8 @@ function buildOrder(orderRequest: OrderRequest, products: Product[]): Order{
 
     const order: Order = {
         pk: orderRequest.email,
+        sk: uuid(),
+        createdAt: Date.now(),
         billing: {
             payment: orderRequest.payment,
             totalPrice: totalPrice
