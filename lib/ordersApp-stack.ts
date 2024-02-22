@@ -5,6 +5,7 @@ import * as dynamodb from "aws-cdk-lib/aws-dynamodb"
 import * as ssm from "aws-cdk-lib/aws-ssm"
 import * as sns from "aws-cdk-lib/aws-sns"
 import * as subs from "aws-cdk-lib/aws-sns-subscriptions"
+import * as iam from "aws-cdk-lib/aws-iam"
 import { Construct } from "constructs"
 
 interface OrdersAppStackProps extends cdk.StackProps {
@@ -42,7 +43,11 @@ export class OrdersAppStack extends cdk.Stack {
 
         // Orders Events Layer
         const ordersEventsLayerArn = ssm.StringParameter.valueForStringParameter(this, "OrderLayerEventsVersionArn")
-        const ordersEventsLyer = lambda.LayerVersion.fromLayerVersionArn(this, "OrderEventsLayerVersionArn", ordersEventsLayerArn)
+        const ordersEventsLayer = lambda.LayerVersion.fromLayerVersionArn(this, "OrderEventsLayerVersionArn", ordersEventsLayerArn)
+
+        // Orders Events Repository Layer
+        const ordersEventsRepositoryLayerArn = ssm.StringParameter.valueForStringParameter(this, "OrderLayerEventsRepositoryVersionArn")
+        const ordersEventsRepositoryLyer = lambda.LayerVersion.fromLayerVersionArn(this, "OrderEventsRepositoryLayerVersionArn", ordersEventsRepositoryLayerArn)
 
         // Products Layer 
         // ? Products Layer
@@ -71,7 +76,7 @@ export class OrdersAppStack extends cdk.Stack {
                 ORDERS_DDB: ordersDdb.tableName,
                 ORDER_EVENTS_TOPIC_ARN: ordersTopic.topicArn
             },
-            layers: [ordersLayer, productsLayer, ordersApiLayer, ordersEventsLyer],
+            layers: [ordersLayer, productsLayer, ordersApiLayer, ordersEventsLayer],
             tracing: lambda.Tracing.ACTIVE,
             insightsVersion: lambda.LambdaInsightsVersion.VERSION_1_0_119_0
         })
@@ -94,12 +99,25 @@ export class OrdersAppStack extends cdk.Stack {
             environment:{
                 EVENTS_DDB: props.eventsDdb.tableName
             },
-            layers: [ordersEventsLyer],
+            layers: [ordersEventsLayer, ordersEventsRepositoryLyer],
             tracing: lambda.Tracing.ACTIVE,
             insightsVersion: lambda.LambdaInsightsVersion.VERSION_1_0_119_0
         }) 
 
         ordersTopic.addSubscription(new subs.LambdaSubscription(orderEventsHandler))
+
+        const eventsDdbPolicy = new iam.PolicyStatement({
+            effect: iam.Effect.ALLOW,
+            actions: ["dynamodb:PutItem"],
+            resources: [props.eventsDdb.tableArn],
+            conditions: {
+                ['ForAllValues:StringLike']: {
+                    'dynamodb:LeadingKeys': ["#order_*"]
+                }
+            }
+        })
+
+        orderEventsHandler.addToRolePolicy(eventsDdbPolicy)
 
     }
 }
