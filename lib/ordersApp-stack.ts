@@ -150,7 +150,13 @@ export class OrdersAppStack extends cdk.Stack {
             enforceSSL: false, 
             encryption: sqs.QueueEncryption.UNENCRYPTED
         })
-        ordersTopic.addSubscription(new subs.SqsSubscription(orderEventsQueue))
+        ordersTopic.addSubscription(new subs.SqsSubscription(orderEventsQueue, {
+            filterPolicy: {
+                eventType: sns.SubscriptionFilter.stringFilter({
+                    allowlist: ['ORDER_CREATED']
+                })
+            }
+        }))
 
         const orderEmailsHandler = new lambdaNodeJS.NodejsFunction(this, "OrderEmailsFunction", {
             runtime: lambda.Runtime.NODEJS_20_X,
@@ -168,7 +174,11 @@ export class OrdersAppStack extends cdk.Stack {
             insightsVersion: lambda.LambdaInsightsVersion.VERSION_1_0_119_0
         }) 
 
-        orderEmailsHandler.addEventSource(new lambdaEventSource.SqsEventSource(orderEventsQueue))
+        orderEmailsHandler.addEventSource(new lambdaEventSource.SqsEventSource(orderEventsQueue, {
+            batchSize: 5,
+            enabled: true,
+            maxBatchingWindow: cdk.Duration.minutes(1)
+        }))
         orderEventsQueue.grantConsumeMessages(orderEmailsHandler)
 
     }
