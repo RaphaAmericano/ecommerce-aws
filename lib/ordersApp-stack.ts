@@ -17,6 +17,7 @@ interface OrdersAppStackProps extends cdk.StackProps {
 
 export class OrdersAppStack extends cdk.Stack {
     public readonly ordersHandler: lambdaNodeJS.NodejsFunction
+    public readonly orderEventsFetchHandler: lambdaNodeJS.NodejsFunction
     constructor(scope: Construct, id: string, props: OrdersAppStackProps ){
         super(scope, id, props)
 
@@ -49,7 +50,7 @@ export class OrdersAppStack extends cdk.Stack {
 
         // Orders Events Repository Layer
         const ordersEventsRepositoryLayerArn = ssm.StringParameter.valueForStringParameter(this, "OrderLayerEventsRepositoryVersionArn")
-        const ordersEventsRepositoryLyer = lambda.LayerVersion.fromLayerVersionArn(this, "OrderEventsRepositoryLayerVersionArn", ordersEventsRepositoryLayerArn)
+        const ordersEventsRepositoryLayer = lambda.LayerVersion.fromLayerVersionArn(this, "OrderEventsRepositoryLayerVersionArn", ordersEventsRepositoryLayerArn)
 
         // Products Layer 
         // ? Products Layer
@@ -101,7 +102,7 @@ export class OrdersAppStack extends cdk.Stack {
             environment:{
                 EVENTS_DDB: props.eventsDdb.tableName
             },
-            layers: [ordersEventsLayer, ordersEventsRepositoryLyer],
+            layers: [ordersEventsLayer, ordersEventsRepositoryLayer],
             tracing: lambda.Tracing.ACTIVE,
             insightsVersion: lambda.LambdaInsightsVersion.VERSION_1_0_119_0
         }) 
@@ -197,5 +198,32 @@ export class OrdersAppStack extends cdk.Stack {
             resources: ["*"]
         })
         orderEmailsHandler.addToRolePolicy(orderEmailSesPolicy)
+
+        const orderEventsFetchHandler = new lambdaNodeJS.NodejsFunction(this, "OrderEventsFetchFunction", {
+            runtime: lambda.Runtime.NODEJS_20_X,
+            functionName: "OrderEventsFetchFunction",
+            entry: "lambda/orders/orderEventsFetchFunction.ts",
+            handler: "handler",
+            memorySize: 512,
+            timeout: cdk.Duration.seconds(5),
+            bundling:{
+                minify: true, 
+                sourceMap: false
+            },
+            environment: {
+                EVENTS_DDB: props.eventsDdb.tableName
+            },
+            layers: [ordersEventsRepositoryLayer],
+            tracing: lambda.Tracing.ACTIVE,
+            insightsVersion: lambda.LambdaInsightsVersion.VERSION_1_0_119_0
+        }) 
+
+        const eventsFetchDdbPolicy = new iam.PolicyStatement({
+                effect: iam.Effect.ALLOW,
+                actions: ['dynamodb:Query'],
+                resources: [`${props.eventsDdb.tableArn}/emailIndex/*`],
+        })        
+        this.orderEventsFetchHandler.addToRolePolicy(eventsFetchDdbPolicy)
+
     }
 }
