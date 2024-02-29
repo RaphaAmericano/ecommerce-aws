@@ -208,6 +208,6 @@ export class InvoiceWSApiStack extends cdk.Stack {
         webSocketApi.addRoute("cancelImport", {
             integration: new apigatewayv2_integrations.WebSocketLambdaIntegration("CancelImportHandler", cancelImportHandler)
         })
-
+        
     }
 }
