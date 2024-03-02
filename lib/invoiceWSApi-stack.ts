@@ -7,6 +7,7 @@ import * as lambda from "aws-cdk-lib/aws-lambda"
 import * as iam from "aws-cdk-lib/aws-iam"
 import * as s3 from "aws-cdk-lib/aws-s3"
 import * as s3n from "aws-cdk-lib/aws-s3-notifications"
+import * as ssm from "aws-cdk-lib/aws-ssm"
 import { Construct } from "constructs"
 import * as apigatewayv2 from "aws-cdk-lib/aws-apigatewayv2"
 import * as apigatewayv2_integrations from "aws-cdk-lib/aws-apigatewayv2-integrations"
@@ -14,6 +15,17 @@ import * as apigatewayv2_integrations from "aws-cdk-lib/aws-apigatewayv2-integra
 export class InvoiceWSApiStack extends cdk.Stack {
     constructor(scope: Construct, id: string, props?: cdk.StackProps) {
         super(scope, id, props)
+
+        // Invoice Transaction Layer
+        const invoiceTransactionLayerArn = ssm.StringParameter.valueForStringParameter(this, "InvoiceTransactionLayerVersionArn")
+        const invoiceTransactionLayer = lambda.LayerVersion.fromLayerVersionArn(this, "InvoiceTransactionLayerVersion", invoiceTransactionLayerArn)
+
+        // Invoice Layer
+        const invoiceRepositoryLayerArn = ssm.StringParameter.valueForStringParameter(this, "InvoiceRepositoryLayerVersionArn")
+        const invoiceRepositoryLayer = lambda.LayerVersion.fromLayerVersionArn(this, "InvoiceRepositoryLayerVersion", invoiceTransactionLayerArn)
+        // Invoice WebSocket API Layer
+        const invoiceWSConnectionLayerArn = ssm.StringParameter.valueForStringParameter(this, "InvoiceWSConnectionLayerVersionArn")
+        const invoiceWSConnectionLayer = lambda.LayerVersion.fromLayerVersionArn(this, "InvoiceWSConnectionLayerVersion", invoiceTransactionLayerArn)
 
         // Invoice and invoice transaction DDB
         const invoicesDdb = new dynamodb.Table(this, "InvoicesDdb", {
@@ -105,6 +117,7 @@ export class InvoiceWSApiStack extends cdk.Stack {
                 minify: true, 
                 sourceMap: false
             },
+            layers:[invoiceTransactionLayer, invoiceWSConnectionLayer],
             tracing: lambda.Tracing.ACTIVE,
             environment: {
                 INVOICE_DDB: invoicesDdb.tableName,
@@ -147,6 +160,7 @@ export class InvoiceWSApiStack extends cdk.Stack {
                 minify: true, 
                 sourceMap: false
             },
+            layers: [invoiceRepositoryLayer, invoiceTransactionLayer, invoiceWSConnectionLayer],
             tracing: lambda.Tracing.ACTIVE,
             environment: {
                 INVOICE_DDB: invoicesDdb.tableName,
@@ -179,6 +193,7 @@ export class InvoiceWSApiStack extends cdk.Stack {
                 minify: true, 
                 sourceMap: false
             },
+            layers: [invoiceTransactionLayer, invoiceWSConnectionLayer],
             tracing: lambda.Tracing.ACTIVE,
             environment: {
                 INVOICE_DDB: invoicesDdb.tableName,
