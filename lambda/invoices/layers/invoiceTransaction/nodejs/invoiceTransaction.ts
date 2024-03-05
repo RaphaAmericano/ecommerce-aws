@@ -20,7 +20,7 @@ export interface InvoiceTransaction {
     transactionStatus: InvoiceTransactionStatus;
 }
 
-export class InvoiceTransacationRepository {
+export class InvoiceTransactionRepository {
     private ddbClient: DocumentClient;
     private invoiceTransaction: string;
 
