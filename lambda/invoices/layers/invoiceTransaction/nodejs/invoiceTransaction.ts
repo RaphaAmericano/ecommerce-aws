@@ -22,19 +22,56 @@ export interface InvoiceTransaction {
 
 export class InvoiceTransactionRepository {
     private ddbClient: DocumentClient;
-    private invoiceTransaction: string;
+    private invoiceTransactionDdb: string;
 
-    constructor(ddbClient: DocumentClient, invoiceTransaction: string){
+    constructor(ddbClient: DocumentClient, invoiceTransactionDdb: string){
         this.ddbClient = ddbClient;
-        this.invoiceTransaction = invoiceTransaction;
+        this.invoiceTransactionDdb = invoiceTransactionDdb;
     }
 
     async createInvoiceTransaction(invoiceTransaction: InvoiceTransaction): Promise<InvoiceTransaction>{
         await this.ddbClient.put({
-            TableName: this.invoiceTransaction,
+            TableName: this.invoiceTransactionDdb,
             Item: invoiceTransaction
         }).promise()
         return invoiceTransaction
+    }
+
+    async getInvoiceTransaction(key: string): Promise<InvoiceTransaction> {
+        const data = await this.ddbClient.get({
+            TableName: this.invoiceTransactionDdb,
+            Key: {
+                pk: "#transaction",
+                sk: key
+            }
+        }).promise()
+        if(data.Item){
+            return data.Item as InvoiceTransaction
+        } else {
+            throw new Error("Invoice transaction not found")
+        }
+    }
+
+    async updateInvoiceTransaction(key: string, status: InvoiceTransactionStatus): Promise<boolean>{
+        try {
+            await this.ddbClient.update({
+                TableName: this.invoiceTransactionDdb,
+                Key: {
+                    pk: "#transaction",
+                    sk: key
+                },
+                ConditionExpression: 'attribute_exists(pk)',
+                UpdateExpression: "set transactionStatus = :s",
+                ExpressionAttributeValues: {
+                    ':s': status
+                }
+
+            }).promise()
+            return true
+        } catch (ConditionalCheckFailedExceptions) {
+            console.error("Invoice transaction not found", ConditionalCheckFailedExceptions)
+            return false
+        }
     }
 
 }
