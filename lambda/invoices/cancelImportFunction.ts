@@ -27,9 +27,8 @@ export async function handler(event: APIGatewayProxyEvent, context: Context): Pr
     console.log(`ConnectionId: ${connectionId} - Lambda requestId: ${lambdaRequestId}`)
 
     try {
+        
         const invoiceTransaction = await invoiceTransactionRepository.getInvoiceTransaction(transactionId)
-
-
 
         if(invoiceTransaction.transactionStatus === InvoiceTransactionStatus.GENERATED){
             await Promise.all([
