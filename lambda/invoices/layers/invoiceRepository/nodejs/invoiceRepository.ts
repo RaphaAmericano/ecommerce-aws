@@ -34,8 +34,4 @@ export class InvoiceRepository {
         }).promise()
         return invoice
     }
-
-
-
-
 }

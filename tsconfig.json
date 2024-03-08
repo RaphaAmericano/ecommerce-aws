@@ -47,7 +47,7 @@
         "lambda/invoices/layers/invoiceTransaction/nodejs/invoiceTransaction"
       ],
       "/opt/nodejs/invoiceRepository": [
-        "lambda/invoices/layers/invoiceRepository/nodejs/invoiceTransactioninvoiceTransaction"
+        "lambda/invoices/layers/invoiceRepository/nodejs/invoiceRepository"
       ],
       "/opt/nodejs/invoiceWSConnection": [
         "lambda/invoices/layers/invoiceWSConnection/nodejs/invoiceWSConnection"

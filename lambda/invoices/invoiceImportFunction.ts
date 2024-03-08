@@ -64,7 +64,7 @@ async function processRecord(record: S3EventRecord){
             productId: invoice.productId,
             quantity: invoice.quantity,
             transactionId: key,
-            createAt: Date.now()
+            createdAt: Date.now()
         })
 
         const deleteObjectPromise = s3Client.deleteObject({
