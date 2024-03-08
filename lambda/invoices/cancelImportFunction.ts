@@ -28,6 +28,9 @@ export async function handler(event: APIGatewayProxyEvent, context: Context): Pr
 
     try {
         const invoiceTransaction = await invoiceTransactionRepository.getInvoiceTransaction(transactionId)
+
+
+
         if(invoiceTransaction.transactionStatus === InvoiceTransactionStatus.GENERATED){
             await Promise.all([
                 invoiceWSService.sendInvoiceStatus(transactionId, connectionId, InvoiceTransactionStatus.CANCELLED),
@@ -42,6 +45,8 @@ export async function handler(event: APIGatewayProxyEvent, context: Context): Pr
         console.error(`Invoice transaction not found - TransactionId: ${transactionId}`)
         await invoiceWSService.sendInvoiceStatus(transactionId, connectionId, InvoiceTransactionStatus.NOT_FOUND)
     }
+
+    await invoiceWSService.disconnectClient(connectionId)
 
     return {
         statusCode: 200,
