@@ -56,5 +56,64 @@ export class AuditEventsBusStack extends cdk.Stack {
         })
 
         nonValidOrderRule.addTarget(new targets.LambdaFunction(ordersErrorsFunction))
+
+
+        // source:app.invoice
+        // detailType: invoice
+        // errorDetails: FAIL_NO_INVOICE_NUMBER
+        const nonValidInvoiceRule = new events.Rule(this, "NonValidInvoiceRule", {
+            ruleName: "NonValidInvoiceRule",
+            description: "Rule matching non valid invoice number",
+            eventBus: this.bus,
+            eventPattern: {
+                source: ["app.invoice"],
+                detailType: ['invoice'],
+                detail: {
+                    errorDetails: ["FAIL_NO_INVOICE_NUMBER"]
+                }
+            }
+        })
+
+        //target: 
+
+        const invoicesErrorsFunction = new lambdaNodeJS.NodejsFunction(this, "InvoicesErrorsFunction", {
+            runtime: lambda.Runtime.NODEJS_20_X,
+            functionName: "InvoicesErrorsFunction",
+            entry: "lambda/audit/invoicesErrorsFunction.ts",
+            handler: "handler",
+            memorySize: 512,
+            timeout: cdk.Duration.seconds(5),
+            bundling:{
+                minify: true, 
+                sourceMap: false
+            },
+            tracing: lambda.Tracing.ACTIVE,
+            insightsVersion: lambda.LambdaInsightsVersion.VERSION_1_0_119_0
+        })
+
+        nonValidOrderRule.addTarget(new targets.LambdaFunction(invoicesErrorsFunction))
+
+        // source:app.invoice
+        // detailType: invoice
+        // errorDetails: TIMEOUT
+        const timeoutImportInvoiceRule = new events.Rule(this, "TimeoutImportInvoiceRule", {
+            ruleName: "TimeoutImportInvoiceRule",
+            description: "Rule matching timeout import invoice",
+            eventBus: this.bus,
+            eventPattern: {
+                source: ["app.invoice"],
+                detailType: ['invoice'],
+                detail: {
+                    errorDetails: ["TIMEOUT"]
+                }
+            }
+        })
+
+        // target:
+        const invoiceImportTimeoutQueue = new sqs.Queue(this, "InvoiceImportTimeout", {
+            queueName: "invoice-import-timeout"
+        })
+        timeoutImportInvoiceRule.addTarget(new targets.SqsQueue(invoiceImportTimeoutQueue))
+
     }
 }
