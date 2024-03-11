@@ -91,7 +91,7 @@ export class AuditEventsBusStack extends cdk.Stack {
             insightsVersion: lambda.LambdaInsightsVersion.VERSION_1_0_119_0
         })
 
-        nonValidOrderRule.addTarget(new targets.LambdaFunction(invoicesErrorsFunction))
+        nonValidInvoiceRule.addTarget(new targets.LambdaFunction(invoicesErrorsFunction))
 
         // source:app.invoice
         // detailType: invoice
