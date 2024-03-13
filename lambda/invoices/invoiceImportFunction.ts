@@ -1,5 +1,5 @@
 import { Context, S3Event, S3EventRecord } from "aws-lambda"
-import { ApiGatewayManagementApi, DynamoDB, S3 } from "aws-sdk"
+import { ApiGatewayManagementApi, DynamoDB, EventBridge, S3 } from "aws-sdk"
 import * as AWSXRay from "aws-xray-sdk"
 import { InvoiceTransactionRepository, InvoiceTransactionStatus } from "/opt/nodejs/invoiceTransaction"
 import { InvoiceWSService } from "/opt/nodejs/invoiceWSConnection"
@@ -10,12 +10,14 @@ AWSXRay.captureAWS(require("aws-sdk"))
 
 const invoicesDdb = process.env.INVOICE_DDB!
 const invoicesWsApiEndpoint = process.env.INVOICE_WSAPI_ENDPOINT!.substring(6)
+const auditBusName = process.env.AUDIT_BUS_NAME!
 
 const s3Client = new S3()
 const ddbClient = new DynamoDB.DocumentClient()
 const apigwManagementApi = new ApiGatewayManagementApi({
     endpoint: invoicesWsApiEndpoint
 })
+const eventBridgeClient = new EventBridge()
 
 const invoiceTransactionRepository = new InvoiceTransactionRepository(ddbClient, invoicesDdb)
 const invoiceWSService = new InvoiceWSService(apigwManagementApi)
@@ -57,13 +59,34 @@ async function processRecord(record: S3EventRecord){
         const invoice = JSON.parse(object.Body!.toString("utf-8")) as InvoiceFile
 
         if(invoice.invoiceNumber.length >= 5){
-            console.log(`Invalide invoice number`)
+            console.log(`Invalid invoice number`)
+
+            const putEventPromise = eventBridgeClient.putEvents({
+                Entries: [
+                    {
+                        Source: "app.invoice",
+                        EventBusName: auditBusName,
+                        DetailType: "invoice",
+                        Time: new Date(),
+                        Detail: JSON.stringify({
+                            errorDetail: "FAIL_NO_INVOICE_NUMBER",
+                            info: {
+                                invoiceKey: key,
+                                customerName: invoice.customerName
+                            }
+                        })
+                    }
+                ]
+            }).promise()
+
             const updateInvoicePromise = invoiceTransactionRepository.updateInvoiceTransaction(key, InvoiceTransactionStatus.NON_VALID_INVOICE_NUMBER)
             const sendStatusPromise = invoiceWSService.sendInvoiceStatus(key, invoiceTransaction.connectionId, InvoiceTransactionStatus.PROCESSED)
             const disconnectClient = invoiceWSService.disconnectClient(invoiceTransaction.connectionId)
-            await Promise.all([updateInvoicePromise, sendStatusPromise, disconnectClient])
+            await Promise.all([updateInvoicePromise, sendStatusPromise, disconnectClient, putEventPromise])
 
         } else {
+
+
             const createInvoicePromise = invoiceRepository.create({
                 pk: `#invoice_${invoice.customerName}`,
                 sk: invoice.invoiceNumber,
