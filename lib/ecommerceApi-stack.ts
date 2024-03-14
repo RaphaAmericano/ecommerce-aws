@@ -4,6 +4,7 @@ import * as apigateway from "aws-cdk-lib/aws-apigateway"
 import * as cwlogs from "aws-cdk-lib/aws-logs"
 import * as cognito from "aws-cdk-lib/aws-cognito"
 import * as lambda from "aws-cdk-lib/aws-lambda"
+
 import { Construct } from "constructs"
 
 interface ECommerceApiStackProps extends cdk.StackProps {
@@ -44,8 +45,42 @@ export class EcommerceApiStack extends cdk.Stack {
     }   
 
     private createCognitoAuth(){
+        const postConfirmationHandler = new lambdaNodeJS.NodejsFunction(this, "PostConfirmationFunction", {
+            runtime: lambda.Runtime.NODEJS_20_X,
+            functionName: "PostConfirmationFunction",
+            entry: "lambda/auth/postConfirmationFunciton.ts",
+            handler: "handler",
+            memorySize: 512,
+            timeout: cdk.Duration.seconds(5),
+            bundling:{
+                minify: true, 
+                sourceMap: false
+            },
+            tracing: lambda.Tracing.ACTIVE,
+            insightsVersion: lambda.LambdaInsightsVersion.VERSION_1_0_119_0
+        })
+
+        const preAuthenticationHandler = new lambdaNodeJS.NodejsFunction(this, "PreAuthenticationHandler", {
+            runtime: lambda.Runtime.NODEJS_20_X,
+            functionName: "preAuthenticationHandler",
+            entry: "lambda/auth/preAuthenticationHandler.ts",
+            handler: "handler",
+            memorySize: 512,
+            timeout: cdk.Duration.seconds(5),
+            bundling:{
+                minify: true, 
+                sourceMap: false
+            },
+            tracing: lambda.Tracing.ACTIVE,
+            insightsVersion: lambda.LambdaInsightsVersion.VERSION_1_0_119_0
+        })
+
         // Cognito customer UserPool
         this.customerPool = new cognito.UserPool(this, "CustomerPool", {
+            lambdaTriggers: {
+                preAuthentication: preAuthenticationHandler,
+                postConfirmation: postConfirmationHandler
+            },
             userPoolName: "CustomerPool",
             removalPolicy: cdk.RemovalPolicy.DESTROY,
             selfSignUpEnabled: true,
@@ -221,13 +256,26 @@ export class EcommerceApiStack extends cdk.Stack {
     }
     private createProductsService(props: ECommerceApiStackProps, api: apigateway.RestApi ): void {
         const productsFetchIntegration = new apigateway.LambdaIntegration(props.productsFetchHandler)
+
+        const productsFetchWebMobileIntegration = {
+            authorizer: this.productsAuthorizer,
+            authorizationType: apigateway.AuthorizationType.COGNITO,
+            authorizationScopes: ["customer/web", "customer/mobile"]
+        }
+
+        const productsFetchWebIntegration = {
+            authorizer: this.productsAuthorizer,
+            authorizationType: apigateway.AuthorizationType.COGNITO,
+            authorizationScopes: ["customer/web"]
+        }
+
         // ? "/products"
         const productsResource = api.root.addResource("products")
-        productsResource.addMethod("GET", productsFetchIntegration)
+        productsResource.addMethod("GET", productsFetchIntegration, productsFetchWebMobileIntegration)
 
         // ? /products/{id}
         const productIdResource = productsResource.addResource("{id}")
-        productIdResource.addMethod("GET", productsFetchIntegration)
+        productIdResource.addMethod("GET", productsFetchIntegration, productsFetchWebIntegration)
 
         // info: Admin
 
