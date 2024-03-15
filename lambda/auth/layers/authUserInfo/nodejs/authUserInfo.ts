@@ -11,7 +11,7 @@ export class AuthInfoService {
         const userPoolId = authorizer?.claims.iss.split("amazonaws.com/")[1]
         const username = authorizer?.claims.username
 
-        const user  =await this.cognitoIdentityServiceProvider.adminGetUser({
+        const user = await this.cognitoIdentityServiceProvider.adminGetUser({
             UserPoolId: userPoolId,
             Username: username
         }).promise()
@@ -22,6 +22,10 @@ export class AuthInfoService {
         } else {
             throw new Error("Email not found")
         }
+    }
+
+    isAdminUser(authorizer: APIGatewayEventDefaultAuthorizerContext):boolean {
+        return authorizer?.claims.scope.startsWith("admin")
     }
 
 }

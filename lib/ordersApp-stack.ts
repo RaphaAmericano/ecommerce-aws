@@ -56,6 +56,8 @@ export class OrdersAppStack extends cdk.Stack {
                 cw.ComparisonOperator.GREATER_THAN_OR_EQUAL_TO_THRESHOLD,
             treatMissingData: cw.TreatMissingData.NOT_BREACHING
         })
+        const authLayerArn = ssm.StringParameter.valueForStringParameter(this, "AuthUserInfoLayerVersionArn")
+        const authLayer = lambda.LayerVersion.fromLayerVersionArn(this, "AuthLayerVersionArn", authLayerArn)
         // Orders Layer
         const ordersLayerArn = ssm.StringParameter.valueForStringParameter(this, "OrdersLayerVersionArn")
         const ordersLayer = lambda.LayerVersion.fromLayerVersionArn(this, "OrdersLayerVersionArn", ordersLayerArn)
@@ -100,9 +102,9 @@ export class OrdersAppStack extends cdk.Stack {
                 ORDER_EVENTS_TOPIC_ARN: ordersTopic.topicArn,
                 AUDIT_BUS_NAME: props.auditBus.eventBusName
             },
-            layers: [ordersLayer, productsLayer, ordersApiLayer, ordersEventsLayer],
+            layers: [authLayer, ordersLayer, productsLayer, ordersApiLayer, ordersEventsLayer],
             tracing: lambda.Tracing.ACTIVE,
-            insightsVersion: lambda.LambdaInsightsVersion.VERSION_1_0_119_0
+            // insightsVersion: lambda.LambdaInsightsVersion.VERSION_1_0_119_0
         })
 
         ordersDdb.grantReadWriteData(this.ordersHandler)

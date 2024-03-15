@@ -17,6 +17,8 @@ interface ECommerceApiStackProps extends cdk.StackProps {
 export class EcommerceApiStack extends cdk.Stack {
     private productsAuthorizer: apigateway.CognitoUserPoolsAuthorizer
     private productsAdminAuthorizer: apigateway.CognitoUserPoolsAuthorizer
+    private ordersAuthorizer: apigateway.CognitoUserPoolsAuthorizer
+    private ordersAdminAuthorizer: apigateway.CognitoUserPoolsAuthorizer
     private customerPool: cognito.UserPool
     private adminPool: cognito.UserPool
     constructor(scope: Construct, id: string, props: ECommerceApiStackProps ){
@@ -52,9 +54,22 @@ export class EcommerceApiStack extends cdk.Stack {
             statements: [adminUserPolicyStatement]
         })
         adminUserPolicy.attachToRole(<iam.Role> props.productsAdminHandler.role )
+        adminUserPolicy.attachToRole(<iam.Role> props.ordersHandler.role )
+
+        const customerUserPolicyStatement = new iam.PolicyStatement({
+            effect: iam.Effect.ALLOW,
+            actions: ["cognito-idp:AdminGetUser"],
+            resources: [this.customerPool.userPoolArn]
+        })
+
+        const customerUserPolicy = new iam.Policy(this, "CustomerGetUserPolicy", {
+            statements: [customerUserPolicyStatement]
+        })
+        customerUserPolicy.attachToRole(<iam.Role> props.ordersHandler.role )
 
         this.createProductsService(props, api)
         this.createOrdersService(props, api)
+
     }   
 
     private createCognitoAuth(){
@@ -242,6 +257,16 @@ export class EcommerceApiStack extends cdk.Stack {
             cognitoUserPools: [this.adminPool]
         })
 
+        this.ordersAuthorizer = new apigateway.CognitoUserPoolsAuthorizer(this, "OrdersAuthorizer", {
+            authorizerName: "OrdersAAuthorizer",
+            cognitoUserPools: [this.customerPool, this.adminPool]
+        })
+
+        this.ordersAdminAuthorizer = new apigateway.CognitoUserPoolsAuthorizer(this, "OrdersAdminAuthorizer", {
+            authorizerName: "OrdersAdminAuthorizer",
+            cognitoUserPools: [this.adminPool]
+        })
+
     }
 
 
@@ -249,12 +274,27 @@ export class EcommerceApiStack extends cdk.Stack {
         const ordersIntegration = new apigateway.LambdaIntegration(props.ordersHandler)
         // info: resource - /orders
 
+        const ordersWebIntegration = {
+            authorizer: this.ordersAuthorizer,
+            authorizationType: apigateway.AuthorizationType.COGNITO,
+            authorizationScope: ["customer/web","admin/web"]
+        }
+
+        const ordersWebMobileIntegration = {
+            authorizer: this.ordersAdminAuthorizer,
+            authorizationType: apigateway.AuthorizationType.COGNITO,
+            authorizationScope: ["customer/web", "customer/mobile", "admin/web"]
+        }
+
         const ordersResource = api.root.addResource("orders")
         // ? GET /orders
         // ? GET /orders?email=no-reply@email.com.br
         // ? GET /orders?email=no-reply@email.com.br&orderId=123
-        ordersResource.addMethod("GET", ordersIntegration)
-
+        ordersResource.addMethod("GET", ordersIntegration, {
+            authorizer: this.ordersAdminAuthorizer,
+            authorizationType: apigateway.AuthorizationType.COGNITO,
+            authorizationScopes:["customer/web", "customer/mobile", "admin/web"]
+        })
         
         // ? DELETE /orders?email=no-reply@email.com.br&orderId=123
         const orderDeletionValidator = new apigateway.RequestValidator(this, "OrderDeletionValidator", {
@@ -267,7 +307,8 @@ export class EcommerceApiStack extends cdk.Stack {
                 "method.request.querystring.email": true,
                 "method.request.querystring.orderId": true,
             },
-            requestValidator: orderDeletionValidator
+            requestValidator: orderDeletionValidator,
+            ...ordersWebMobileIntegration
         })
         // ? POST /orders
         const orderRequestValidator = new apigateway.RequestValidator(this, "OrderRequestValidator", {
@@ -297,7 +338,7 @@ export class EcommerceApiStack extends cdk.Stack {
                     }
                 },
                 required: [
-                    "email",
+                    // "email",
                     "productIds",
                     "payment"
                 ]
@@ -307,7 +348,8 @@ export class EcommerceApiStack extends cdk.Stack {
             requestValidator: orderRequestValidator,
             requestModels: {
                 "application/json": orderModel
-            }
+            },
+            ...ordersWebIntegration
         })
         
         const orderEventsResource = ordersResource.addResource("events")  
@@ -326,7 +368,8 @@ export class EcommerceApiStack extends cdk.Stack {
                 'method.request.querystring.email': true,
                 'method.request.querystring.eventType': false
             },
-            requestValidator: orderEventsFetchValidator
+            requestValidator: orderEventsFetchValidator,
+            ...ordersWebMobileIntegration
         })
 
     }
